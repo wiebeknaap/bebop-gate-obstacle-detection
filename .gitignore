@@ -1,29 +1,5 @@
-# Python
-__pycache__/
-*.pyc
-
-# Conda / virtual envs
-.env
-.venv
-env/
-venv/
-miniconda/
-anaconda/
 
 # Jupyter
 .ipynb_checkpoints/
 
-# Data (DO NOT COMMIT)
-data/raw/images/
-data/annotations/
-data/tfrecords/
 
-# Training outputs
-models/
-checkpoints/
-logs/
-exported_model/
-
-# OS
-.DS_Store
-Thumbs.db

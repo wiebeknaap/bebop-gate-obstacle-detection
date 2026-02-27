@@ -1,0 +1,26 @@
+<annotation>
+	<folder>raw</folder>
+	<filename>33511000.jpg</filename>
+	<path>/home/wiebe/Desktop/Robotic/AE4317/testing_nn/data/raw/33511000.jpg</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>240</width>
+		<height>520</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>obstacle</name>
+		<pose>Unspecified</pose>
+		<truncated>1</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>40</xmin>
+			<ymin>357</ymin>
+			<xmax>240</xmax>
+			<ymax>402</ymax>
+		</bndbox>
+	</object>
+</annotation>
