@@ -1,0 +1,9 @@
+# data.yaml
+path: /home/wiebe/Desktop/Robotic/AE4317/testing_nn/data/  # root dir
+train: train/images
+val: val/images
+
+# Classes
+names:
+  0: gate
+  1: obstacle
