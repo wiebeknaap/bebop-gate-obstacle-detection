@@ -1,0 +1,26 @@
+<annotation>
+	<folder>pre-procest</folder>
+	<filename>737089571.jpg</filename>
+	<path>/home/wiebe/Desktop/Robotic/AE4317/testing_nn/data/pre-procest/737089571.jpg</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>240</width>
+		<height>240</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>gate</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>61</xmin>
+			<ymin>2</ymin>
+			<xmax>164</xmax>
+			<ymax>200</ymax>
+		</bndbox>
+	</object>
+</annotation>
