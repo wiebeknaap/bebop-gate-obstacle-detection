@@ -48,6 +48,62 @@ for image in images:
             'cy': cy,
         })
         cv2.rectangle(debug_img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+        gate_pairs = []
+        candidate_blobs = sorted(candidate_blobs, key=lambda blob: blob['cx'])
+        for i in range(len(candidate_blobs)):
+            for j in range(i + 1, len(candidate_blobs)):
+
+                left_blob = candidate_blobs[i]
+                right_blob = candidate_blobs[j]
+
+                width_diff = abs(left_blob['w'] - right_blob['w'])
+                if width_diff > 20:
+                    continue
+
+                height_diff = abs(left_blob['h'] - right_blob['h'])
+                if height_diff > 50:
+                    continue
+
+                left_inner = left_blob['x'] + left_blob['w']
+                right_inner = right_blob['x']
+                opening_width = right_inner - left_inner
+                if opening_width < 40:
+                    continue
+
+                if opening_width > 250:
+                    continue
+
+                y_diff = abs(left_blob['cy'] - right_blob['cy'])
+                if y_diff > 40:
+                    continue
+
+                height_score = 1 - (height_diff / max(left_blob['h'], right_blob['h']))
+                width_score = 1 - (width_diff / max(left_blob['w'], right_blob['w']))
+                y_score = 1 - (y_diff / max(left_blob['h'], right_blob['h']))
+
+                avg_height = 0.5 * (left_blob['h'] + right_blob['h'])
+                ratio = opening_width / avg_height
+
+                ideal_ratio = 1.0
+                spacing_score = max(0, 1 - abs(ratio - ideal_ratio))
+
+                score = (
+                        0.4 * height_score +
+                        0.2 * width_score +
+                        0.2 * y_score +
+                        0.2 * spacing_score
+                )
+
+                gate_pairs.append({
+                    'left_blob': left_blob,
+                    'right_blob': right_blob,
+                    'opening_width': opening_width,
+                    'score': score
+                })
+
+
+
     cv2.imshow("mask", mask)
     cv2.imshow("blobs", debug_img)
     key = cv2.waitKey(0)
