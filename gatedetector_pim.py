@@ -101,7 +101,39 @@ for image in images:
                     'opening_width': opening_width,
                     'score': score
                 })
+        if len(gate_pairs) > 0:
+            best_gate = max(gate_pairs, key=lambda pair: pair['score'])
 
+            left_blob = best_gate['left_blob']
+            right_blob = best_gate['right_blob']
+
+            left_inner = left_blob['x'] + left_blob['w']
+            right_inner = right_blob['x']
+
+            gate_center_x = int((left_inner + right_inner) / 2)
+            gate_center_y = int((left_blob['cy'] + right_blob['cy']) / 2)
+
+            # teken de twee boxen
+            cv2.rectangle(debug_img,
+                          (left_blob['x'], left_blob['y']),
+                          (left_blob['x'] + left_blob['w'], left_blob['y'] + left_blob['h']),
+                          (0, 255, 0), 2)
+
+            cv2.rectangle(debug_img,
+                          (right_blob['x'], right_blob['y']),
+                          (right_blob['x'] + right_blob['w'], right_blob['y'] + right_blob['h']),
+                          (0, 255, 0), 2)
+
+            # lijn tussen de binnenkanten
+            cv2.line(debug_img,
+                     (left_inner, gate_center_y),
+                     (right_inner, gate_center_y),
+                     (0, 255, 255), 2)
+
+            # midden van de opening
+            cv2.circle(debug_img, (gate_center_x, gate_center_y), 5, (0, 0, 255), -1)
+
+            print("best score:", best_gate['score'])
 
 
     cv2.imshow("mask", mask)
