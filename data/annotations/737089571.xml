@@ -23,4 +23,16 @@
 			<ymax>200</ymax>
 		</bndbox>
 	</object>
+	<object>
+		<name>obstacle</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>13</xmin>
+			<ymin>4</ymin>
+			<xmax>54</xmax>
+			<ymax>153</ymax>
+		</bndbox>
+	</object>
 </annotation>
