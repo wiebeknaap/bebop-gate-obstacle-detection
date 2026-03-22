@@ -1,31 +1,37 @@
 #ifndef PLANT_AVOIDER_H
 #define PLANT_AVOIDER_H
 
-#include <stdint.h>
-#include "modules/computer_vision/lib/vision/image.h"
+#include "std.h"
 
-#define GRID_ROWS              8
-#define GRID_COLS              10
-#define SOBEL_THRESHOLD        60
-#define EDGE_DENSITY_THRESHOLD 0.25f
+#define GRID_ROWS 25
+#define GRID_COLS 20
+
+#ifndef PLANT_AVOIDER_CAMERA
+#define PLANT_AVOIDER_CAMERA front_camera
+#endif
+#ifndef PLANT_AVOIDER_FPS
+#define PLANT_AVOIDER_FPS 4
+#endif
+
+#define SOBEL_THRESHOLD        30
+#define EDGE_DENSITY_THRESHOLD 0.10f
 #define MIN_VERTICAL_FILL      0.03f
+#define TURN_THRESHOLD         0.4f
 
-#define ROI_X_START  0.10f
-#define ROI_X_END    0.90f
-#define ROI_Y_START  0.10f
-#define ROI_Y_END    0.90f
+#define ROI_X_START 0.1f
+#define ROI_X_END   0.9f
+#define ROI_Y_START 0.1f
+#define ROI_Y_END   0.9f
 
-typedef struct {
-    int   safe_col;
-    int   obstacle_detected;
-    float cell_density[GRID_ROWS][GRID_COLS];
-    int   cell_obstacle[GRID_ROWS][GRID_COLS];
-} PlantAvoiderResult;
+struct plant_avoider_result_t {
+  bool     obstacle_detected;
+  int32_t  safe_col;
+  float    unsafe_ratio;
+  bool     turn_left;
+};
 
-void plant_avoider_init(void);
-void plant_avoider_periodic(void);
-struct image_t *plant_avoider_detect(struct image_t *img, uint8_t camera_id);
+extern struct plant_avoider_result_t plant_avoider_result;
 
-extern PlantAvoiderResult plant_avoider_result;
+extern void plant_avoider_init(void);
 
-#endif /* PLANT_AVOIDER_H */
+#endif
