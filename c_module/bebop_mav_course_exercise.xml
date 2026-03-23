@@ -1,0 +1,9 @@
+<!DOCTYPE settings SYSTEM "../settings.dtd">
+<settings target="ap|nps">
+  <dl_settings>
+    <dl_settings NAME="mav_course_exercise">
+      <dl_setting var="oa_heading_increment" min="5" step="5" max="180" shortname="heading_increment" type="float"/>
+      <dl_setting var="divergence_threshold" min="0.0" step="0.05" max="1.0" shortname="div_threshold" type="float"/>
+    </dl_settings>
+  </dl_settings>
+</settings>
