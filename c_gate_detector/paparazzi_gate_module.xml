@@ -1,0 +1,13 @@
+<!-- Template Paparazzi module declaration.
+     Adjust file paths and init/periodic hooks to your airframe tree. -->
+<module name="paparazzi_gate_module" dir="modules/computer_vision">
+  <doc>
+    Lightweight gate detector + guidance bridge.
+  </doc>
+  <file name="gate_detector_c.c" />
+  <file name="gate_guidance_c.c" />
+  <file name="paparazzi_gate_module.c" />
+  <header name="gate_detector_c.h" />
+  <header name="gate_guidance_c.h" />
+  <init fun="paparazzi_gate_init(640,480)" />
+</module>
