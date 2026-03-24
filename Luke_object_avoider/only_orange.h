@@ -1,5 +1,5 @@
-#ifndef SIMPLE_OBSTACLE_AVOIDER_H
-#define SIMPLE_OBSTACLE_AVOIDER_H
+#ifndef ONLY_ORANGE_H
+#define ONLY_ORANGE_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -12,6 +12,14 @@ struct orange_info {
   bool left_detected;
   bool middle_detected;
   bool right_detected;
+};
+
+
+struct kalman_1d {
+  float x;
+  float p;
+  float q;
+  float r;
 };
 
 enum action {
@@ -30,18 +38,18 @@ extern int max_confidence;
 
 extern struct orange_info orange_raw;
 extern struct orange_info orange_filtered;
-extern struct command last_command;
-extern enum action last_action;
 extern int obstacle_confidence;
 
-void simple_obstacle_avoider_init(void);
-void simple_obstacle_avoider_periodic(void);
+void only_orange_init(void);
+void only_orange_periodic(void);
 
 void set_orange_fractions(float left_fraction, float middle_fraction, float right_fraction);
-
 void update_detection_flags(struct orange_info *orange);
+void temporal_filter(void);
 int update_confidence(const struct orange_info *orange);
 enum action decide_action(const struct orange_info *orange, int confidence);
 const char *action_name(enum action action);
 
+void kalman_init(struct kalman_1d *kf, float process_variance, float measurement_variance, float initial_value);
+float kalman_update(struct kalman_1d *kf, float measurement);
 #endif

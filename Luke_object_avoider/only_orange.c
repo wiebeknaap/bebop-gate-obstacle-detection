@@ -1,4 +1,4 @@
-#include "simple_obstacle_avoider.h"
+#include "only_orange.h"
 #include "state.h"
 #include "firmwares/rotorcraft/guidance/guidance_h.h"
 #include "modules/computer_vision/cv.h"
@@ -7,6 +7,7 @@
 #include "generated/airframe.h"
 #include <math.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifndef VERBOSE
 #define VERBOSE 0
@@ -19,15 +20,14 @@
 #define PRINT(string, ...)
 #endif
 
-#ifndef SIMPLE_OBSTACLE_AVOIDER_VISUAL_DETECTION_ID
-#define SIMPLE_OBSTACLE_AVOIDER_VISUAL_DETECTION_ID ABI_BROADCAST
+#ifndef ONLY_ORANGE_VISUAL_DETECTION_ID
+#define ONLY_ORANGE_VISUAL_DETECTION_ID ABI_BROADCAST
 #endif
 
 static abi_event color_detection_ev;
 static bool orange_updated = false;
 
 float orange_detect_threshold = 0.02f;
-
 float middle_strong_threshold = 0.1f;
 int low_conf_threshold = 1;
 int high_conf_threshold = 3;
@@ -48,13 +48,6 @@ struct orange_info orange_filtered;
 struct command last_command;
 enum action last_action = SEARCH;
 int obstacle_confidence = 0;
-
-static float absvalue(float x){
-  if (x < 0.f) {
-    return -x;
-  }
-  return x;
-}
 
 static float clampf(float x, float lo, float hi)
 {
@@ -82,7 +75,6 @@ float kalman_update(struct kalman_1d *kf, float measurement){
   }
 
   kf->p = kf->p + kf->q;
-
   kalman_gain = kf->p / (kf->p + kf->r);
   kf->x = kf->x + kalman_gain * (measurement - kf->x);
   kf->p = (1.0f - kalman_gain) * kf->p;
@@ -96,6 +88,9 @@ void update_detection_flags(struct orange_info *orange){
     orange->middle_detected = (orange->middle_fraction >= orange_detect_threshold);
     orange->right_detected = (orange->right_fraction >= orange_detect_threshold);
   }
+  else{
+    return;
+  }
 }
 
 void set_orange_fractions(float left_fraction, float middle_fraction, float right_fraction){
@@ -103,7 +98,7 @@ void set_orange_fractions(float left_fraction, float middle_fraction, float righ
   orange_raw.middle_fraction = middle_fraction;
   orange_raw.right_fraction = right_fraction;
 
-  update_detection_flags(&orange_raw, 0);
+  update_detection_flags(&orange_raw);
 }
 
 void temporal_filter(void){
@@ -260,8 +255,6 @@ static void color_detection_cb(uint8_t sender_id,
 
   if (extra == 0) {
     update_orange_from_detection(pixel_x, quality);
-  } else if (extra == 1) {
-    update_green_from_detection(pixel_x, pixel_y, quality);
   }
 }
 
@@ -276,60 +269,29 @@ static void decay_raw_measurements_if_needed(void)
   orange_updated = false;
 }
 
-void simple_obstacle_avoider_init(void)
+void only_orange_init(void)
 {
   set_orange_fractions(0.f, 0.f, 0.f);
-  set_green_fractions(0.f, 0.f);
 
   kalman_init(&kf_orange_left,   1e-4f, 5e-3f, 0.f);
   kalman_init(&kf_orange_middle, 1e-4f, 5e-3f, 0.f);
   kalman_init(&kf_orange_right,  1e-4f, 5e-3f, 0.f);
-  kalman_init(&kf_green_floor,   1e-4f, 5e-3f, 0.f);
-  kalman_init(&kf_green_plant,   1e-4f, 5e-3f, 0.f);
 
   obstacle_confidence = 0;
   last_action = SEARCH;
-  last_command.forward_speed = 0.f;
-  last_command.yaw_rate = 0.f;
-
   orange_updated = false;
 
-  AbiBindMsgVISUAL_DETECTION(SIMPLE_OBSTACLE_AVOIDER_VISUAL_DETECTION_ID,
+  AbiBindMsgVISUAL_DETECTION(ONLY_ORANGE_VISUAL_DETECTION_ID,
                              &color_detection_ev,
                              color_detection_cb);
 }
 
-void simple_obstacle_avoider_periodic(void)
+void only_orange_periodic(void)
 {
-  if (guidance_h.mode != GUIDANCE_H_MODE_GUIDED) {
-    obstacle_confidence = 0;
-    last_action = SEARCH;
-    last_command.forward_speed = 0.f;
-    last_command.yaw_rate = 0.f;
-    return;
-  }
 
   decay_raw_measurements_if_needed();
   temporal_filter();
   update_confidence(&orange_filtered);
 
   last_action = decide_action(&orange_filtered, obstacle_confidence);
-  last_command = action_to_command(last_action, &orange_filtered);
-
-  if (last_command.yaw_rate == 0.f) {
-    guidance_h_set_heading(stateGetNedToBodyEulers_f()->psi);
-  } else {
-    guidance_h_set_heading_rate(last_command.yaw_rate);
-  }
-
-  guidance_h_set_body_vel(last_command.forward_speed, 0.f);
-
-  PRINT("action=%s conf=%d orange=(%.3f %.3f %.3f) cmd=(%.3f %.3f)\n",
-        action_name(last_action),
-        obstacle_confidence,
-        orange_filtered.left_fraction,
-        orange_filtered.middle_fraction,
-        orange_filtered.right_fraction,
-        last_command.forward_speed,
-        last_command.yaw_rate);
 }
