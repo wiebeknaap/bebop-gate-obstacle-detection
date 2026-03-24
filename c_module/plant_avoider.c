@@ -1,3 +1,19 @@
+/*
+ * plant_avoider.c
+ *
+ * Sobel vertical-edge obstacle avoider for the AE4317 MAV course.
+ * Runs as a computer-vision callback on front_camera.
+ * Results are written to plant_avoider_result and read by mav_exercise.c.
+ *
+ * Pipeline:
+ *  1. Extract Y from YUV422 image inside ROI
+ *  2. Sobel-X → vertical edge mask
+ *  3. Filter columns with too little vertical fill
+ *  4. GRID_ROWS × GRID_COLS density grid → obstacle flags
+ *  5. analyze_front: unsafe ratio over all rows, middle 5 columns
+ *  6. Turn decision: compare safe cells on left half vs right half
+ */
+
 #include "plant_avoider.h"
 #include "modules/computer_vision/cv.h"
 #include "modules/core/abi.h"
@@ -6,6 +22,7 @@
 #include <math.h>
 #include <pthread.h>
 
+/* ── Shared result (written by vision thread, read by periodic) ── */
 struct plant_avoider_result_t plant_avoider_result = {
   .obstacle_detected = false,
   .safe_col          = GRID_COLS / 2,
@@ -15,6 +32,7 @@ struct plant_avoider_result_t plant_avoider_result = {
 
 static pthread_mutex_t pa_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+/* ── Helper: Y value from UYVY buffer ───────────────────── */
 static inline uint8_t get_y(const uint8_t *buf, uint32_t x, uint32_t y,
                              uint32_t w)
 {
@@ -22,6 +40,7 @@ static inline uint8_t get_y(const uint8_t *buf, uint32_t x, uint32_t y,
   return buf[idx];
 }
 
+/* ── Sobel-X magnitude at pixel (px,py) ─────────────────── */
 static inline int32_t sobel_x_at(const uint8_t *buf,
                                   uint32_t px, uint32_t py,
                                   uint32_t img_w, uint32_t img_h)
@@ -39,6 +58,7 @@ static inline int32_t sobel_x_at(const uint8_t *buf,
   return abs(g);
 }
 
+/* ── Vision callback ────────────────────────────────────── */
 static struct image_t *plant_avoider_cb(struct image_t *img,
                                         uint8_t cam_id __attribute__((unused)))
 {
@@ -48,6 +68,7 @@ static struct image_t *plant_avoider_cb(struct image_t *img,
   const uint32_t H   = img->h;
   const uint8_t *buf = (const uint8_t *)img->buf;
 
+  /* ── 1. ROI bounds ──────────────────────────────────── */
   uint32_t rx0 = (uint32_t)(ROI_X_START * W);
   uint32_t rx1 = (uint32_t)(ROI_X_END   * W);
   uint32_t ry0 = (uint32_t)(ROI_Y_START * H);
@@ -56,6 +77,7 @@ static struct image_t *plant_avoider_cb(struct image_t *img,
   uint32_t roi_w = rx1 - rx0;
   uint32_t roi_h = ry1 - ry0;
 
+  /* ── 2. Edge mask ───────────────────────────────────── */
   uint8_t *mask = (uint8_t *)calloc(roi_w * roi_h, 1);
   if (!mask) return img;
 
@@ -66,6 +88,7 @@ static struct image_t *plant_avoider_cb(struct image_t *img,
     }
   }
 
+  /* ── 3. Vertical fill filter ────────────────────────── */
   uint32_t min_pix = (uint32_t)(MIN_VERTICAL_FILL * roi_h);
   for (uint32_t rx = 0; rx < roi_w; rx++) {
     uint32_t sum = 0;
@@ -74,6 +97,7 @@ static struct image_t *plant_avoider_cb(struct image_t *img,
       for (uint32_t ry = 0; ry < roi_h; ry++) mask[ry * roi_w + rx] = 0;
   }
 
+  /* ── 4. Grid density → obstacle flags ──────────────── */
   uint32_t cell_h = roi_h / GRID_ROWS;
   uint32_t cell_w = roi_w / GRID_COLS;
 
@@ -100,6 +124,7 @@ static struct image_t *plant_avoider_cb(struct image_t *img,
 
   free(mask);
 
+  /* ── 5. Unsafe ratio: all rows, middle 5 columns ────── */
   int mid_col = GRID_COLS / 2;
   uint32_t unsafe_cnt = 0;
   for (int r = 0; r < GRID_ROWS; r++)
@@ -108,6 +133,7 @@ static struct image_t *plant_avoider_cb(struct image_t *img,
 
   float unsafe_ratio = (float)unsafe_cnt / (float)(GRID_ROWS * 5);
 
+  /* ── 6. Count safe cells on left vs right half ───────── */
   int left_safe  = 0;
   int right_safe = 0;
   for (int r = 0; r < GRID_ROWS; r++) {
@@ -119,8 +145,10 @@ static struct image_t *plant_avoider_cb(struct image_t *img,
 
   bool turn_left = (left_safe >= right_safe);
 
+  /* ── 7. Obstacle decision ───────────────────────────── */
   bool obstacle_detected = (unsafe_ratio >= TURN_THRESHOLD);
 
+  /* ── 8. Write result (mutex protected) ─────────────── */
   pthread_mutex_lock(&pa_mutex);
   plant_avoider_result.obstacle_detected = obstacle_detected;
   plant_avoider_result.safe_col          = mid_col;
@@ -131,6 +159,7 @@ static struct image_t *plant_avoider_cb(struct image_t *img,
   return img;
 }
 
+/* ── Module init ────────────────────────────────────────── */
 void plant_avoider_init(void)
 {
   cv_add_to_device(&PLANT_AVOIDER_CAMERA, plant_avoider_cb,
