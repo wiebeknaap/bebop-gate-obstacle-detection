@@ -45,7 +45,7 @@ static struct kalman_1d kf_orange_right;
 
 struct orange_info orange_raw;
 struct orange_info orange_filtered;
-// enum action last_action = SEARCH;
+extern enum action last_action = SEARCH;
 int obstacle_confidence = 0;
 
 static float clampf(float x, float lo, float hi)
