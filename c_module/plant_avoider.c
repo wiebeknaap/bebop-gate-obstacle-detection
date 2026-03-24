@@ -3,7 +3,8 @@
  *
  * Sobel vertical-edge obstacle avoider for the AE4317 MAV course.
  * Runs as a computer-vision callback on front_camera.
- * Results are written to plant_avoider_result and read by mav_exercise.c.
+ * Results are written to plant_avoider_result and read by mav_exercise.c
+ * via plant_avoider_get_result() — the only thread-safe access point.
  *
  * Pipeline:
  *  1. Extract Y from YUV422 image inside ROI
@@ -22,7 +23,7 @@
 #include <math.h>
 #include <pthread.h>
 
-/* ── Shared result (written by vision thread, read by periodic) ── */
+/* ── Shared result (written by vision thread, read via getter) ── */
 struct plant_avoider_result_t plant_avoider_result = {
   .obstacle_detected = false,
   .safe_col          = GRID_COLS / 2,
@@ -31,6 +32,18 @@ struct plant_avoider_result_t plant_avoider_result = {
 };
 
 static pthread_mutex_t pa_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+/* ── Public thread-safe getter ──────────────────────────────────
+ *  Call this from mav_exercise.c instead of reading the struct directly.
+ *  Copies the current result into *out under the mutex.
+ */
+void plant_avoider_get_result(struct plant_avoider_result_t *out)
+{
+  if (!out) return;
+  pthread_mutex_lock(&pa_mutex);
+  *out = plant_avoider_result;
+  pthread_mutex_unlock(&pa_mutex);
+}
 
 /* ── Helper: Y value from UYVY buffer ───────────────────── */
 static inline uint8_t get_y(const uint8_t *buf, uint32_t x, uint32_t y,
