@@ -1,0 +1,121 @@
+<!--
+  gate_detector.xml
+  Paparazzi module XML for the blue post-pair gate detector.
+
+  INSTALLATION
+  ============
+  1. Copy this file to:    paparazzi/conf/modules/gate_detector.xml
+  2. Copy gate_detector.h  to: paparazzi/sw/airborne/modules/gate_detector/gate_detector.h
+  3. Copy gate_detector.c  to: paparazzi/sw/airborne/modules/gate_detector/gate_detector.c
+
+  4. In your airframe XML (e.g. bebop_course_orangeavoid.xml), add BEFORE other cv modules:
+
+       <module name="video_thread">
+         <define name="FRONT_CAMERA_ROTATE"  value="TRUE"/>   <!-- if camera is portrait -->
+       </module>
+       <module name="gate_detector">
+         <define name="GATE_DETECTOR_CAMERA" value="front_camera"/>
+       </module>
+
+  5. To subscribe to gate detections from your own navigation module:
+
+       #include "subsystems/abi.h"
+       static abi_event gate_ev;
+
+       static void gate_cb(uint8_t sender_id,
+                           int16_t pixel_x, int16_t pixel_y,
+                           int16_t pixel_w,  int16_t pixel_h,
+                           int32_t quality,  int16_t extra) {
+           bool  valid = (extra == 1);
+           float conf  = quality / 10000.0f;
+           // pixel_x, pixel_y are opening centre (image coords)
+           // Use gate_latest.lateral_error / vertical_error directly for guidance
+       }
+
+       void my_nav_init(void) {
+           AbiBindMsgVISUAL_DETECTION(GATE_DETECTOR_ID, &gate_ev, gate_cb);
+       }
+
+  6. For GUIDED-mode navigation, use gate_latest directly in your periodic function:
+       #include "modules/gate_detector/gate_detector.h"
+       // gate_latest.lateral_error  ∈ [-1,+1], 0 = gate centred horizontally
+       // gate_latest.vertical_error ∈ [-1,+1], 0 = gate centred vertically
+       // gate_latest.yaw_proxy       ≈ gate yaw from post-width asymmetry
+       // gate_latest.valid           = true when confidence ≥ GATE_MIN_CONFIDENCE
+
+  TUNING (YUV thresholds)
+  =======================
+  The detector works directly on YUV422 (UYVY) pixel values — no OpenCV needed.
+  In Paparazzi's UYVY format:
+    U > 128 → pixel is blue-dominant
+    V < 128 → pixel is not red-dominant
+  Default thresholds for the TU Delft competition gate (MAVLab blue):
+    gate_u_min = 130,  gate_v_max = 150,  gate_y_min = 20,  gate_y_max = 220
+  If the detector misses the gate → lower gate_u_min (try 115–125).
+  If the detector fires on green foliage → raise gate_u_min (try 135–145).
+-->
+
+<module name="gate_detector" dir="gate_detector">
+  <doc>
+    <description>
+      Blue post-pair gate detector for drone racing. Processes YUV422 images
+      directly — no OpenCV required. Publishes gate position via VISUAL_DETECTION
+      ABI message. Access control errors via the gate_latest global struct.
+    </description>
+    <define name="GATE_DETECTOR_CAMERA" value="front_camera"
+            description="Camera device to use (default: front_camera)"/>
+    <define name="GATE_DETECTOR_FPS"    value="15"
+            description="Callback frequency in Hz (default: 15)"/>
+    <define name="GATE_DETECTOR_VERBOSE" value=""
+            description="Define to enable printf status messages"/>
+
+    <section name="GATE_THRESHOLDS" prefix="GATE_">
+      <define name="U_MIN"  value="130" description="Min U channel value for blue pixel (0-255)"/>
+      <define name="U_MAX"  value="255" description="Max U channel value for blue pixel"/>
+      <define name="V_MIN"  value="50"  description="Min V channel value for blue pixel"/>
+      <define name="V_MAX"  value="150" description="Max V channel value for blue pixel"/>
+      <define name="Y_MIN"  value="20"  description="Min Y (luma) for blue pixel"/>
+      <define name="Y_MAX"  value="220" description="Max Y (luma) for blue pixel"/>
+    </section>
+    <section name="GATE_GEOMETRY" prefix="GATE_">
+      <define name="POST_MIN_ASPECT"    value="1.5"  description="Min post height/width ratio"/>
+      <define name="POST_MAX_ASPECT"    value="14.0" description="Max post height/width (kills legs/rods)"/>
+      <define name="COL_DENSITY_MIN"    value="0.18" description="Min column blue-fill fraction (kills shelf edges)"/>
+      <define name="MIN_GAP_TO_POST_W"  value="1.5"  description="Min gap / max_post_width (kills single-pole splits)"/>
+      <define name="MAX_OPENING_ASPECT" value="2.2"  description="Max opening width/height (kills banners)"/>
+      <define name="MIN_CONFIDENCE"     value="0.50" description="Detection score threshold [0,1]"/>
+      <define name="PURITY_U_HARD_FLOOR" value="120" description="Min mean-U in post (kills orange pillars)"/>
+    </section>
+  </doc>
+
+  <header>
+    <file name="gate_detector.h"/>
+  </header>
+
+  <init    fun="gate_detector_init()"/>
+  <periodic fun="gate_detector_periodic()" freq="15" autorun="TRUE"/>
+
+  <settings>
+    <dl_settings name="GateDetector">
+      <!-- YUV colour thresholds — tune live from GCS -->
+      <dl_setting var="gate_u_min"  min="90" step="5" max="170" shortname="u_min"
+                  module="gate_detector/gate_detector"
+                  handler="gate_detector_set_u_min"/>
+      <dl_setting var="gate_v_max"  min="90" step="5" max="180" shortname="v_max"
+                  module="gate_detector/gate_detector"
+                  handler="gate_detector_set_v_max"/>
+      <!-- Scoring -->
+      <dl_setting var="gate_min_confidence" min="0.30" step="0.05" max="0.90"
+                  shortname="min_conf" module="gate_detector/gate_detector"/>
+      <dl_setting var="gate_purity_u_floor" min="80" step="5" max="160"
+                  shortname="purity_fl" module="gate_detector/gate_detector"/>
+      <!-- Debug -->
+      <dl_setting var="gate_debug_overlay" min="0" step="1" max="1"
+                  shortname="overlay" module="gate_detector/gate_detector"/>
+    </dl_settings>
+  </settings>
+
+  <makefile>
+    <file name="gate_detector.c"/>
+  </makefile>
+</module>
